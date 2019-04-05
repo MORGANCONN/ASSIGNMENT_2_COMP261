@@ -19,9 +19,11 @@ public class AucklandMapping extends GUI {
     private Map<String, Node> Nodes = new HashMap<>();
     private TrieNode roadNameRoot;
     private double scale = 8;
+    private Queue<Node> selectedNodes = new ArrayDeque<>();
 
 
     public AucklandMapping() {
+
     }
 
     private void processData(File node, File roadInfo, File segmentInfo) {
@@ -135,30 +137,43 @@ public class AucklandMapping extends GUI {
         for (String s : Nodes.keySet()) {
             if (Math.sqrt(Math.pow(Nodes.get(s).nodePoints.x - e.getX(), 2) + Math.pow(Nodes.get(s).nodePoints.y - e.getY(), 2)) <= 2) {
                 dehighlightStreets();
-                Nodes.get(s).isSelected ^= true;
-                Set<String> roadIDs = new HashSet<>();
-                String intersectionText = "Node ID: " + Nodes.get(s).nodeID;
-                intersectionText += "\nRoads:";
-                for (Segment seg : Nodes.get(s).outgoingEdges) {
-                    roadIDs.add(seg.roadId);
+                Nodes.get(s).isSelected = true;
+                printStreets(s);
+                selectedNodes.offer(Nodes.get(s));
+                if(selectedNodes.size() > 2){
+                    selectedNodes.poll();
+                    aStarRouteSearch(new ArrayList<>(selectedNodes));
                 }
-                Set<String> roadNames = new HashSet<>();
-                for (String id : roadIDs) {
-                    if (Roads.get(id).StreetName != null) {
-                        roadNames.add(Roads.get(id).StreetName);
-                    }
-                }
-                for (String streetName : roadNames) {
-                    intersectionText += "\n -" + streetName;
-                }
-                getTextOutputArea().setText(intersectionText);
                 for (String n : Nodes.keySet()) {
-                    if (n != s && Nodes.get(n).isSelected) {
-                        Nodes.get(n).isSelected ^= true;
+                    if (selectedNodes.contains(Nodes.get(n)) && Nodes.get(n).isSelected) {
+                        Nodes.get(n).isSelected = false;
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Prints all of the information for the supplied node
+     */
+
+    public void printStreets(String selectedNode){
+        Set<String> roadIDs = new HashSet<>();
+        String intersectionText = "Node ID: " + Nodes.get(selectedNode).nodeID;
+        intersectionText += "\nRoads:";
+        for (Segment seg : Nodes.get(selectedNode).outgoingEdges) {
+            roadIDs.add(seg.roadId);
+        }
+        Set<String> roadNames = new HashSet<>();
+        for (String id : roadIDs) {
+            if (Roads.get(id).StreetName != null) {
+                roadNames.add(Roads.get(id).StreetName);
+            }
+        }
+        for (String streetName : roadNames) {
+            intersectionText += "\n -" + streetName;
+        }
+        getTextOutputArea().setText(intersectionText);
     }
 
     /**
@@ -259,7 +274,30 @@ public class AucklandMapping extends GUI {
             prefixSearch();
         }
     }
+    private ArrayList<Node> aStarRouteSearch(ArrayList<Node> startAndEndNode){
+        if(startAndEndNode.size()>2){
+            throw new RuntimeException();
+        }
+        ArrayList<aStarSearchNode> visited = new ArrayList<>(); // The Fringe
+        PriorityQueue<aStarSearchNode> fringe = new PriorityQueue<>(new Comparator<aStarSearchNode>() {
+            public int compare(aStarSearchNode o1, aStarSearchNode o2) {
+                if(o1.getremainingDistanceHeuristic()>o2.getremainingDistanceHeuristic()){
+                    return 1;
+                } else if(o1.getremainingDistanceHeuristic()<o2.getremainingDistanceHeuristic()){
+                    return -1;
+                } else {
+                    return 0;
+                }
+            }
+        });
+        aStarSearchNode startNode = new aStarSearchNode(startAndEndNode.get(0),null,0, startAndEndNode.get(0).nodeOriginLocation.distance(startAndEndNode.get(1).nodeOriginLocation));
+        startNode.visitNode();
+        fringe.add(new aStarSearchNode(startAndEndNode.get(0),null,0, startAndEndNode.get(0).nodeOriginLocation.distance(startAndEndNode.get(1).nodeOriginLocation)));
+        while(!fringe.isEmpty()){
+        aStarSearchNode currentNode = fringe.poll();
+        }
 
+    }
     /**
      * Depending on m the map either moves to the west, east, north, south and zoom in or out
      *
