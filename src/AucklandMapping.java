@@ -135,20 +135,23 @@ public class AucklandMapping extends GUI {
     protected void onPress(MouseEvent e) {
         pressedMouse = new Point(e.getX(), e.getY());
         for (String s : Nodes.keySet()) {
-            if (Math.sqrt(Math.pow(Nodes.get(s).nodePoints.x - e.getX(), 2) + Math.pow(Nodes.get(s).nodePoints.y - e.getY(), 2)) <= 2) {
-                dehighlightStreets();
+            if (Math.sqrt(Math.pow(Nodes.get(s).nodePoints.x - e.getX(), 2) + Math.pow(Nodes.get(s).nodePoints.y - e.getY(), 2)) <= 4) {
+//                dehighlightStreets();
                 Nodes.get(s).isSelected = true;
                 printStreets(s);
                 selectedNodes.offer(Nodes.get(s));
-                if(selectedNodes.size() > 2){
+                if(selectedNodes.size()==2){
+                    ArrayList<Node> sNodes = new ArrayList<>(selectedNodes);
+                    aStarRouteSearch(sNodes.get(0),sNodes.get(1));
+                } else if(selectedNodes.size() > 2){
                     selectedNodes.poll();
-                    aStarRouteSearch(new ArrayList<>(selectedNodes));
                 }
                 for (String n : Nodes.keySet()) {
-                    if (selectedNodes.contains(Nodes.get(n)) && Nodes.get(n).isSelected) {
+                    if (!selectedNodes.contains(Nodes.get(n)) && Nodes.get(n).isSelected && !Nodes.get(n).routeSelected) {
                         Nodes.get(n).isSelected = false;
                     }
                 }
+                break;
             }
         }
     }
@@ -274,27 +277,61 @@ public class AucklandMapping extends GUI {
             prefixSearch();
         }
     }
-    private ArrayList<Node> aStarRouteSearch(ArrayList<Node> startAndEndNode){
-        if(startAndEndNode.size()>2){
-            throw new RuntimeException();
+    private void aStarRouteSearch(Node startNode, Node endNode){
+        // Sets all nodes heuristic
+        for(String s: Nodes.keySet()){
+            Nodes.get(s).routeSelected = false;
+            Nodes.get(s).deselectRouteRoads();
+            Nodes.get(s).h=(Nodes.get(s).nodeOriginLocation.distance(endNode.nodeOriginLocation));
         }
-        ArrayList<aStarSearchNode> visited = new ArrayList<>(); // The Fringe
-        PriorityQueue<aStarSearchNode> fringe = new PriorityQueue<>(new Comparator<aStarSearchNode>() {
-            public int compare(aStarSearchNode o1, aStarSearchNode o2) {
-                if(o1.getremainingDistanceHeuristic()>o2.getremainingDistanceHeuristic()){
+        HashSet<Node> visited = new HashSet<>();
+        PriorityQueue<Node> fringe = new PriorityQueue<>(new Comparator<Node>() {
+            @Override
+            public int compare(Node o1, Node o2) {
+                if(o1.getF() > o2.getF()){
                     return 1;
-                } else if(o1.getremainingDistanceHeuristic()<o2.getremainingDistanceHeuristic()){
+                } else if(o1.getF()<o2.getF()){
                     return -1;
-                } else {
+                } else{
                     return 0;
                 }
             }
         });
-        aStarSearchNode startNode = new aStarSearchNode(startAndEndNode.get(0),null,0, startAndEndNode.get(0).nodeOriginLocation.distance(startAndEndNode.get(1).nodeOriginLocation));
-        startNode.visitNode();
-        fringe.add(new aStarSearchNode(startAndEndNode.get(0),null,0, startAndEndNode.get(0).nodeOriginLocation.distance(startAndEndNode.get(1).nodeOriginLocation)));
-        while(!fringe.isEmpty()){
-        aStarSearchNode currentNode = fringe.poll();
+        startNode.setG(0);
+        boolean endNodeFound = false;
+        fringe.add(startNode);
+        Node current = startNode;
+        while(!fringe.isEmpty()&&!endNodeFound){
+            current = fringe.poll();
+            visited.add(current);
+            if(current==endNode){
+                endNodeFound = true;
+            }
+            for(Segment S : current.outgoingEdges){
+                Node road = S.endNode;
+                double roadLength = S.segmentLength;
+                double g = current.getG() + roadLength;
+                double f = g + road.h;
+                if((visited.contains(road))&&(f >= road.getF())){
+                    continue;
+                } else if((!fringe.contains(road)) || (f < road.getF())){
+                    road.setPreviousNode(current);
+                    road.setG(g);
+                    road.setF(f);
+                    if(fringe.contains(road)){
+                        fringe.remove(road);
+                    }
+                    fringe.offer(road);
+                }
+            }
+        }
+        if(current == endNode){
+            while(current.previousNode!=null){
+                current.routeSelected = true;
+                current.printCorrectRoad(current.previousNode);
+                current = current.previousNode;
+                System.out.println(current.nodeID);
+            }
         }
 
     }

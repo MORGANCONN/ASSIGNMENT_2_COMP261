@@ -2,14 +2,14 @@ public class aStarSearchNode {
     private Node currentNode;
     private Node previousNode;
     private boolean isVisited = false;
-    private double distanceTraveled;
-    private double remainingDistanceHeuristic;
+    private double g;
+    private double f;
 
-    public aStarSearchNode(Node cNode, Node pNode, double distanceTraveled, double remainingDistanceHeuristic) {
+    public aStarSearchNode(Node cNode, Node pNode, double g, double f) {
         currentNode = cNode;
         previousNode = pNode;
-        this.remainingDistanceHeuristic = remainingDistanceHeuristic;
-        this.distanceTraveled = distanceTraveled;
+        this.f = f;
+        this.g = g;
     }
 
     /**
@@ -23,16 +23,16 @@ public class aStarSearchNode {
      * Gets the current node's distance traveled
      * @return
      */
-    public double getDistanceTraveled() {
-        return distanceTraveled;
+    public double getG() {
+        return g;
     }
 
     /**
      * Gets the remaining distance heuristic of the current node
      * @return
      */
-    public double getremainingDistanceHeuristic(){
-        return remainingDistanceHeuristic;
+    public double getF(){
+        return f;
     }
 
     /**
@@ -40,15 +40,15 @@ public class aStarSearchNode {
      * @param distanceTraveled the double that distanceTraveled to
      */
     public void setDistanceTraveled(double distanceTraveled){
-        this.distanceTraveled = distanceTraveled;
+        this.g = distanceTraveled;
     }
 
     /**
      *  Sets the remaining distance heuristic of the current node
      * @param remainingDistanceHeuristic the double that remainingDistanceHeuristic is set to
      */
-    public void setRemainingDistanceHeuristic(double remainingDistanceHeuristic){
-        this.remainingDistanceHeuristic = remainingDistanceHeuristic;
+    public void setG(double remainingDistanceHeuristic){
+        this.g = remainingDistanceHeuristic;
     }
 
     public void visitNode(){

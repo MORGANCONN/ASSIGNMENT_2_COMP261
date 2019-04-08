@@ -3,7 +3,7 @@ import java.util.ArrayList;
 
 public class Segment {
     double segmentLength;
-    boolean isSelected;
+    boolean isSelected, routeSelected;
     String roadId;
     Node startNode, endNode;
     ArrayList<Point> Points = new ArrayList<>();
@@ -21,7 +21,7 @@ public class Segment {
      * Draws lines between all of the segments locations with the color depending if the segment is selected
      */
     public void draw(Graphics g, Location origin, double scale) {
-        if(isSelected){
+        if(isSelected || routeSelected){
             g.setColor(Color.red);
         }
         else{
