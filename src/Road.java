@@ -7,8 +7,8 @@ public class Road {
     boolean Oneway, NotForCar, NotForPedestrain, NotForBicycle;
     Double Length;
     int StartNode, EndNode, Type, Speed, RoadClass;
-    ArrayList<Segment> roadSegments = new ArrayList<>();
-    ArrayList<Node> roadNodes = new ArrayList<>();
+    HashSet<Segment> roadSegments = new HashSet<>();
+    HashSet<Node> roadNodes = new HashSet<>();
 
     public Road(String roadId,Double length, int StartNode, int EndNode){
         this.RoadId = roadId;

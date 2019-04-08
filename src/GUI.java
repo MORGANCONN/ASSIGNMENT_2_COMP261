@@ -78,6 +78,16 @@ public abstract class GUI {
 	protected abstract void onMove(Move m);
 
 	/**
+	 * Button Used To Deselect All Selected Objects
+	 */
+	protected abstract void deselectAll();
+
+	/**
+	 * Button used to find articulation points
+	 */
+	protected abstract void findAllArticulationPoints();
+
+	/**
 	 * Is called when the user has successfully selected a directory to load the
 	 * data files from. File objects representing the four files of interested
 	 * are passed to the method. The fourth File, polygons, might be null if it
@@ -281,6 +291,24 @@ public abstract class GUI {
 			}
 		});
 
+		JButton deSelect = new JButton("Deselect");
+		deSelect.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				deselectAll();
+				redraw();
+			}
+		});
+
+		JButton findArticPts = new JButton("Find Articulation Points");
+		findArticPts.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				findAllArticulationPoints();
+				redraw();
+			}
+		});
+
 		// next, make the search box at the top-right. we manually fix
 		// it's size, and add an action listener to call your code when
 		// the user presses enter.
@@ -348,6 +376,7 @@ public abstract class GUI {
 		navigation.add(south);
 		navigation.add(east);
 		controls.add(navigation);
+		controls.add(deSelect);
 		controls.add(Box.createRigidArea(new Dimension(15, 0)));
 		// glue is another invisible component that grows to take up all the
 		// space it can on resize.

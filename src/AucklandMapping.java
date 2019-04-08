@@ -20,6 +20,7 @@ public class AucklandMapping extends GUI {
     private TrieNode roadNameRoot;
     private double scale = 8;
     private Queue<Node> selectedNodes = new ArrayDeque<>();
+    private ArrayList<Node> selectedRouteNodes = new ArrayList<>();
 
 
     public AucklandMapping() {
@@ -95,8 +96,12 @@ public class AucklandMapping extends GUI {
         // Assigns Segments To Correct Nodes
         for (Segment s : unsortedSegments) {
             if (Nodes.get(s.startNode.nodeID) != null) {
-                Nodes.get(s.startNode.nodeID).outgoingEdges.add(s);
+                Nodes.get(s.startNode.nodeID).edges.add(s);
                 Roads.get(s.roadId).roadNodes.add(Nodes.get(s.startNode.nodeID));
+            }
+            if(Nodes.get(s.endNode.nodeID)!=null){
+                Nodes.get(s.endNode.nodeID).edges.add(s);
+                Roads.get(s.roadId).roadNodes.add(Nodes.get(s.endNode.nodeID));
             }
         }
         // Assigns Segments To Road Objects
@@ -164,7 +169,7 @@ public class AucklandMapping extends GUI {
         Set<String> roadIDs = new HashSet<>();
         String intersectionText = "Node ID: " + Nodes.get(selectedNode).nodeID;
         intersectionText += "\nRoads:";
-        for (Segment seg : Nodes.get(selectedNode).outgoingEdges) {
+        for (Segment seg : Nodes.get(selectedNode).edges) {
             roadIDs.add(seg.roadId);
         }
         Set<String> roadNames = new HashSet<>();
@@ -237,8 +242,8 @@ public class AucklandMapping extends GUI {
         for (Road r : roadList) {
             for (Node n : r.roadNodes) {
                 for (Segment s : r.roadSegments) {
-                    if (Nodes.get(n.nodeID).outgoingEdges.contains(s)) {
-                        Nodes.get(n.nodeID).outgoingEdges.get(Nodes.get(n.nodeID).outgoingEdges.indexOf(s)).isSelected = true;
+                    if (Nodes.get(n.nodeID).edges.contains(s)) {
+                        Nodes.get(n.nodeID).edges.get(Nodes.get(n.nodeID).edges.indexOf(s)).isSelected = true;
                         Nodes.get(n.nodeID).isSelected = true;
                     }
                 }
@@ -252,7 +257,7 @@ public class AucklandMapping extends GUI {
      */
     private void dehighlightStreets() {
         for (String n : Nodes.keySet()) {
-            for (Segment o : Nodes.get(n).outgoingEdges) {
+            for (Segment o : Nodes.get(n).edges) {
                 o.isSelected = false;
                 Nodes.get(n).isSelected = false;
             }
@@ -307,8 +312,13 @@ public class AucklandMapping extends GUI {
             if(current==endNode){
                 endNodeFound = true;
             }
-            for(Segment S : current.outgoingEdges){
-                Node road = S.endNode;
+            for(Segment S : current.edges){
+                Node road;
+                if(current==S.endNode){
+                    road = S.startNode;
+                } else{
+                    road = S.endNode;
+                }
                 double roadLength = S.segmentLength;
                 double g = current.getG() + roadLength;
                 double f = g + road.h;
@@ -328,6 +338,7 @@ public class AucklandMapping extends GUI {
         if(current == endNode){
             while(current.previousNode!=null){
                 current.routeSelected = true;
+                selectedRouteNodes.add(current);
                 current.printCorrectRoad(current.previousNode);
                 current = current.previousNode;
                 System.out.println(current.nodeID);
@@ -386,6 +397,19 @@ public class AucklandMapping extends GUI {
             onMove(Move.ZOOM_OUT);
         } else if (e.getWheelRotation() <= -1) {
             onMove(Move.ZOOM_IN);
+        }
+    }
+
+    /**
+     * Deselects all nodes and roads
+     */
+    protected void deselectAll(){
+        for(Node n : selectedRouteNodes){
+            n.deselectRouteRoads();
+        }
+        for(int i = 0;i<selectedNodes.size()+1;i++){
+            Node deselect = selectedNodes.poll();
+            deselect.isSelected = false;
         }
     }
 
