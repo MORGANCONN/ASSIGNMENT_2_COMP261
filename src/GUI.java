@@ -377,6 +377,7 @@ public abstract class GUI {
 		navigation.add(east);
 		controls.add(navigation);
 		controls.add(deSelect);
+		controls.add(findArticPts);
 		controls.add(Box.createRigidArea(new Dimension(15, 0)));
 		// glue is another invisible component that grows to take up all the
 		// space it can on resize.

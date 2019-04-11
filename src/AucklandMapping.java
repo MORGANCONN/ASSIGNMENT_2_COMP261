@@ -21,6 +21,7 @@ public class AucklandMapping extends GUI {
     private double scale = 8;
     private Queue<Node> selectedNodes = new ArrayDeque<>();
     private ArrayList<Node> selectedRouteNodes = new ArrayList<>();
+    private HashSet<Node> articulationPoints = new HashSet<>();
 
 
     public AucklandMapping() {
@@ -96,11 +97,11 @@ public class AucklandMapping extends GUI {
         // Assigns Segments To Correct Nodes
         for (Segment s : unsortedSegments) {
             if (Nodes.get(s.startNode.nodeID) != null) {
-                Nodes.get(s.startNode.nodeID).edges.add(s);
+                Nodes.get(s.startNode.nodeID).outgoingEdges.add(s);
                 Roads.get(s.roadId).roadNodes.add(Nodes.get(s.startNode.nodeID));
             }
-            if(Nodes.get(s.endNode.nodeID)!=null){
-                Nodes.get(s.endNode.nodeID).edges.add(s);
+            if (Nodes.get(s.endNode.nodeID) != null) {
+                Nodes.get(s.endNode.nodeID).incomingEdges.add(s);
                 Roads.get(s.roadId).roadNodes.add(Nodes.get(s.endNode.nodeID));
             }
         }
@@ -145,10 +146,10 @@ public class AucklandMapping extends GUI {
                 Nodes.get(s).isSelected = true;
                 printStreets(s);
                 selectedNodes.offer(Nodes.get(s));
-                if(selectedNodes.size()==2){
+                if (selectedNodes.size() == 2) {
                     ArrayList<Node> sNodes = new ArrayList<>(selectedNodes);
-                    aStarRouteSearch(sNodes.get(0),sNodes.get(1));
-                } else if(selectedNodes.size() > 2){
+                    aStarRouteSearch(sNodes.get(0), sNodes.get(1));
+                } else if (selectedNodes.size() > 2) {
                     selectedNodes.poll();
                 }
                 for (String n : Nodes.keySet()) {
@@ -165,11 +166,11 @@ public class AucklandMapping extends GUI {
      * Prints all of the information for the supplied node
      */
 
-    public void printStreets(String selectedNode){
+    public void printStreets(String selectedNode) {
         Set<String> roadIDs = new HashSet<>();
         String intersectionText = "Node ID: " + Nodes.get(selectedNode).nodeID;
         intersectionText += "\nRoads:";
-        for (Segment seg : Nodes.get(selectedNode).edges) {
+        for (Segment seg : Nodes.get(selectedNode).outgoingEdges) {
             roadIDs.add(seg.roadId);
         }
         Set<String> roadNames = new HashSet<>();
@@ -242,8 +243,8 @@ public class AucklandMapping extends GUI {
         for (Road r : roadList) {
             for (Node n : r.roadNodes) {
                 for (Segment s : r.roadSegments) {
-                    if (Nodes.get(n.nodeID).edges.contains(s)) {
-                        Nodes.get(n.nodeID).edges.get(Nodes.get(n.nodeID).edges.indexOf(s)).isSelected = true;
+                    if (Nodes.get(n.nodeID).outgoingEdges.contains(s)) {
+                        Nodes.get(n.nodeID).outgoingEdges.get(Nodes.get(n.nodeID).outgoingEdges.indexOf(s)).isSelected = true;
                         Nodes.get(n.nodeID).isSelected = true;
                     }
                 }
@@ -257,7 +258,7 @@ public class AucklandMapping extends GUI {
      */
     private void dehighlightStreets() {
         for (String n : Nodes.keySet()) {
-            for (Segment o : Nodes.get(n).edges) {
+            for (Segment o : Nodes.get(n).outgoingEdges) {
                 o.isSelected = false;
                 Nodes.get(n).isSelected = false;
             }
@@ -282,22 +283,23 @@ public class AucklandMapping extends GUI {
             prefixSearch();
         }
     }
-    private void aStarRouteSearch(Node startNode, Node endNode){
+
+    private void aStarRouteSearch(Node startNode, Node endNode) {
         // Sets all nodes heuristic
-        for(String s: Nodes.keySet()){
+        for (String s : Nodes.keySet()) {
             Nodes.get(s).routeSelected = false;
             Nodes.get(s).deselectRouteRoads();
-            Nodes.get(s).h=(Nodes.get(s).nodeOriginLocation.distance(endNode.nodeOriginLocation));
+            Nodes.get(s).h = (Nodes.get(s).nodeOriginLocation.distance(endNode.nodeOriginLocation));
         }
         HashSet<Node> visited = new HashSet<>();
         PriorityQueue<Node> fringe = new PriorityQueue<>(new Comparator<Node>() {
             @Override
             public int compare(Node o1, Node o2) {
-                if(o1.getF() > o2.getF()){
+                if (o1.getF() > o2.getF()) {
                     return 1;
-                } else if(o1.getF()<o2.getF()){
+                } else if (o1.getF() < o2.getF()) {
                     return -1;
-                } else{
+                } else {
                     return 0;
                 }
             }
@@ -306,46 +308,48 @@ public class AucklandMapping extends GUI {
         boolean endNodeFound = false;
         fringe.add(startNode);
         Node current = startNode;
-        while(!fringe.isEmpty()&&!endNodeFound){
+        while (!fringe.isEmpty() && !endNodeFound) {
             current = fringe.poll();
             visited.add(current);
-            if(current==endNode){
+            if (current == endNode) {
                 endNodeFound = true;
             }
-            for(Segment S : current.edges){
+            ArrayList<Segment> combinedEdges = new ArrayList<>(current.outgoingEdges);
+            combinedEdges.addAll(current.incomingEdges);
+            for (Segment S : combinedEdges) {
                 Node road;
-                if(current==S.endNode){
+                if (current == S.endNode) {
                     road = S.startNode;
-                } else{
+                } else {
                     road = S.endNode;
                 }
                 double roadLength = S.segmentLength;
                 double g = current.getG() + roadLength;
                 double f = g + road.h;
-                if((visited.contains(road))&&(f >= road.getF())){
+                if ((visited.contains(road)) && (f >= road.getF())) {
                     continue;
-                } else if((!fringe.contains(road)) || (f < road.getF())){
+                } else if ((!fringe.contains(road)) || (f < road.getF())) {
                     road.setPreviousNode(current);
                     road.setG(g);
                     road.setF(f);
-                    if(fringe.contains(road)){
+                    if (fringe.contains(road)) {
                         fringe.remove(road);
                     }
                     fringe.offer(road);
                 }
             }
         }
-        if(current == endNode){
-            while(current.previousNode!=null){
+        if (current == endNode) {
+            while (current.previousNode != null) {
                 current.routeSelected = true;
                 selectedRouteNodes.add(current);
                 current.printCorrectRoad(current.previousNode);
                 current = current.previousNode;
-                System.out.println(current.nodeID);
             }
         }
 
     }
+
     /**
      * Depending on m the map either moves to the west, east, north, south and zoom in or out
      *
@@ -403,14 +407,53 @@ public class AucklandMapping extends GUI {
     /**
      * Deselects all nodes and roads
      */
-    protected void deselectAll(){
-        for(Node n : selectedRouteNodes){
+    protected void deselectAll() {
+        for (Node n : selectedRouteNodes) {
             n.deselectRouteRoads();
         }
-        for(int i = 0;i<selectedNodes.size()+1;i++){
+        for (int i = 0; i < selectedNodes.size() + 1; i++) {
             Node deselect = selectedNodes.poll();
-            deselect.isSelected = false;
+            if (deselect != null) {
+                deselect.isSelected = false;
+            }
         }
+        selectedNodes.clear();
+    }
+
+    /**
+     * Finds All Articulation Points In The Graph
+     */
+    public void findAllArticulationPoints() {
+        for (Node n : Nodes.values()) {
+            n.nodeDepth = Integer.MAX_VALUE;
+        }
+        articulationPoints = new HashSet<>();
+        Random randomIndex = new Random();
+        Object[] mapNodes = Nodes.values().toArray();
+        Node root = (Node) mapNodes[randomIndex.nextInt(mapNodes.length)];
+        System.out.println(root.nodeID);
+        ArrayList<Segment> neighbours = new ArrayList<>(root.outgoingEdges);
+        neighbours.addAll(root.incomingEdges);
+        for (Segment s : neighbours) {
+            if (s.startNode.nodeID == root.nodeID) {
+                if (s.endNode.nodeDepth == Integer.MAX_VALUE) {
+                    recursiveFindArticulationPoints(s.endNode, 1, root);
+                    root.numberOfSubTrees++;
+                }
+            } else if (s.endNode.nodeID == root.nodeID) {
+                if (s.startNode.nodeDepth == Integer.MAX_VALUE) {
+                    recursiveFindArticulationPoints(s.startNode, 1, root);
+                    root.numberOfSubTrees++;
+                }
+            }
+            if (root.numberOfSubTrees > 0) {
+                articulationPoints.add(root);
+            }
+        }
+    }
+
+    public int recursiveFindArticulationPoints(Node node, int depth, Node parent) {
+
     }
 
 

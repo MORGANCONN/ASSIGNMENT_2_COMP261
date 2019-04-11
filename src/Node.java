@@ -6,9 +6,12 @@ public class Node {
     boolean isSelected, routeSelected;
     Point nodePoints;
     Location nodeOriginLocation;
-    ArrayList<Segment> edges = new ArrayList<>();
+    ArrayList<Segment> incomingEdges = new ArrayList<>();
+    ArrayList<Segment> outgoingEdges = new ArrayList<>();
     double g, f, h;
+    int nodeDepth;
     Node previousNode;
+    int numberOfSubTrees = 0;
 
     public Node(String Id, Point nodePoints, Location nodeOriginLocation) {
         nodeID = Id;
@@ -20,7 +23,7 @@ public class Node {
      * Calls draw method on all of the outgoing edges and draws the node with the color depending on if the node is selected or not
      */
     public void redraw(Graphics g, Location origin, double scale) {
-        for (Segment s : edges) {
+        for (Segment s : outgoingEdges) {
             s.draw(g, origin, scale);
         }
         if (isSelected || routeSelected) {
@@ -74,7 +77,12 @@ public class Node {
     }
 
     public void printCorrectRoad(Node endNode) {
-        for (Segment S : edges) {
+        for (Segment S : outgoingEdges) {
+            if (S.endNode == endNode || S.startNode == endNode) {
+                S.routeSelected = true;
+            }
+        }
+        for (Segment S : incomingEdges) {
             if (S.endNode == endNode || S.startNode == endNode) {
                 S.routeSelected = true;
             }
@@ -84,7 +92,7 @@ public class Node {
     public void deselectRouteRoads() {
         if (routeSelected) {
             routeSelected = false;
-            for (Segment S : edges) {
+            for (Segment S : outgoingEdges) {
                 if (S.routeSelected) {
                     S.routeSelected = false;
                 }
