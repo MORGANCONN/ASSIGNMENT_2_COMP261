@@ -435,12 +435,12 @@ public class AucklandMapping extends GUI {
         ArrayList<Segment> neighbours = new ArrayList<>(root.outgoingEdges);
         neighbours.addAll(root.incomingEdges);
         for (Segment s : neighbours) {
-            if (s.startNode.nodeID == root.nodeID) {
+            if (s.startNode.nodeID.equals(root.nodeID)) {
                 if (s.endNode.nodeDepth == Integer.MAX_VALUE) {
                     recursiveFindArticulationPoints(s.endNode, 1, root);
                     root.numberOfSubTrees++;
                 }
-            } else if (s.endNode.nodeID == root.nodeID) {
+            } else if (s.endNode.nodeID .equals(root.nodeID)) {
                 if (s.startNode.nodeDepth == Integer.MAX_VALUE) {
                     recursiveFindArticulationPoints(s.startNode, 1, root);
                     root.numberOfSubTrees++;
@@ -450,10 +450,49 @@ public class AucklandMapping extends GUI {
                 articulationPoints.add(root);
             }
         }
+        System.out.println(articulationPoints.size());
     }
 
     public int recursiveFindArticulationPoints(Node node, int depth, Node parent) {
-
+        node.nodeDepth = depth;
+        int reachBack = depth;
+        ArrayList<Segment> neighbours = new ArrayList<>(node.outgoingEdges);
+        neighbours.addAll(node.incomingEdges);
+        for (Segment s : neighbours) {
+            if (s.endNode.nodeID.equals(parent.nodeID) || s.startNode.nodeID.equals(parent.nodeID)) {
+                continue;
+            }
+            if (s.startNode.nodeID.equals(node.nodeID)) {
+                if (s.endNode.nodeDepth < Integer.MAX_VALUE) {
+                    reachBack = Math.min(s.endNode.nodeDepth, reachBack);
+                }
+                // case 2: indirect alternative path: neighbour is an unvisited child in the same sub-tree
+                else {
+                    // calculate alternative paths of the child, which can also be reached by itself
+                    int childReach = recursiveFindArticulationPoints(s.endNode, depth + 1, node);
+                    reachBack = Math.min(childReach, reachBack);
+                    // no alternative path from neighbour to any parent
+                    if (childReach >= depth) {
+                        articulationPoints.add(s.endNode);
+                    }// then add node into APs;
+                }
+            } else if (s.endNode.nodeID.equals(node.nodeID)) {
+                if (s.startNode.nodeDepth < Integer.MAX_VALUE) {
+                    reachBack = Math.min(s.startNode.nodeDepth, reachBack);
+                }
+                // case 2: indirect alternative path: neighbour is an unvisited child in the same sub-tree
+                else {
+                    // calculate alternative paths of the child, which can also be reached by itself
+                    int childReach = recursiveFindArticulationPoints(s.startNode, depth + 1, node);
+                    reachBack =Math.min(childReach, reachBack);
+                    // no alternative path from neighbour to any parent
+                    if (childReach >= depth){
+                        articulationPoints.add(s.startNode);
+                    }// then add node into APs;
+                }
+            }
+        }
+        return reachBack;
     }
 
 
