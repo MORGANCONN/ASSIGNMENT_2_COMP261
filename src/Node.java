@@ -3,7 +3,7 @@ import java.util.ArrayList;
 
 public class Node {
     String nodeID;
-    boolean isSelected, routeSelected;
+    boolean isSelected, routeSelected, isArticulationPoint;
     Point nodePoints;
     Location nodeOriginLocation;
     ArrayList<Segment> incomingEdges = new ArrayList<>();
@@ -28,7 +28,9 @@ public class Node {
         }
         if (isSelected || routeSelected) {
             g.setColor(Color.red);
-        } else {
+        } else if(isArticulationPoint){
+            g.setColor(Color.GREEN);
+        }else {
             g.setColor(Color.blue);
         }
         g.fillOval(nodePoints.x - 2, nodePoints.y - 2, 4, 4);
