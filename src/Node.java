@@ -12,7 +12,7 @@ public class Node {
     double g, f, h;
     int nodeDepth;
     Node previousNode;
-    int numberOfSubTrees = 0;
+    public int numberOfSubTrees = 0;
 
     public Node(String Id, Point nodePoints, Location nodeOriginLocation) {
         nodeID = Id;

@@ -5,6 +5,8 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.math.RoundingMode;
+import java.text.DecimalFormat;
 import java.util.*;
 import java.util.List;
 
@@ -17,6 +19,8 @@ public class AucklandMapping extends GUI {
     private Point releasedMouse;
     private Map<String, Road> Roads = new HashMap<String, Road>();
     private Map<String, Node> Nodes = new HashMap<>();
+    private ArrayList<Node> unvisitedNodes = new ArrayList<>();
+    private HashSet<Segment> rootNeighbors = new HashSet<>();
     private TrieNode roadNameRoot;
     private double scale = 8;
     private Queue<Node> selectedNodes = new ArrayDeque<>();
@@ -348,28 +352,33 @@ public class AucklandMapping extends GUI {
             }
         }
         if (current == endNode) {
-            String currentRoadId = null;
+            String currentRoadName = null;
             double currentRoadDistance = 0;
-            ArrayList<String> roadIds = new ArrayList<>();
+            ArrayList<String> roadNames = new ArrayList<>();
             ArrayList<Double> distances = new ArrayList<>();
             while (current.previousNode != null) {
+                current.routeSelected = true;
                 HashSet<Segment> neighbours = new HashSet<>(current.outgoingEdges);
                 neighbours.addAll(current.incomingEdges);
                 for (Segment s : neighbours) {
                     Node previousNode = s.endNode;
                     if (previousNode == current.previousNode || s.startNode == current.previousNode) {
+                        s.routeSelected = true;
                         if (previousNode == current) {
                             previousNode = s.startNode;
                         }
-                        if (s.roadId != currentRoadId) {
-                            if (currentRoadId != null) {
-                                roadIds.add(currentRoadId);
-                            }
-                            currentRoadId = s.roadId;
-                            if (currentRoadDistance > 0) {
+                        if (currentRoadName == null) {
+                            currentRoadName = Roads.get(s.roadId).StreetName;
+                        }
+                        if (!(Roads.get(s.roadId).StreetName.equals(currentRoadName))) {
+                            if (currentRoadName != null) {
+                                roadNames.add(currentRoadName);
                                 distances.add(currentRoadDistance);
+                                currentRoadDistance = 0;
                             }
-                        } else{
+                            currentRoadName = Roads.get(s.roadId).StreetName;
+                            currentRoadDistance += s.segmentLength;
+                        } else {
                             currentRoadDistance += s.segmentLength;
                         }
                         current = previousNode;
@@ -377,11 +386,35 @@ public class AucklandMapping extends GUI {
                     }
                 }
             }
-            String distanceTravelled = "Calculated Route";
-            for (int i = 0; i < roadIds.size(); i++) {
-                distanceTravelled = distanceTravelled + "\n" + Roads.get(roadIds.get(i)).StreetName + " Distance Travelled On This Street: " + distances.get(i);
+            // If there is no roads from the route to be printed it adds the current road and current distance to be printed (Fixed issues with single street routes)
+            if (!roadNames.contains(currentRoadName) && roadNames.isEmpty()) {
+                roadNames.add(currentRoadName);
+                distances.add(currentRoadDistance);
             }
-            getTextOutputArea().setText(distanceTravelled);
+            String routeTaken = "Calculated Route:";
+            // Creates a decimal format to round distances to three decimal places
+            DecimalFormat round = new DecimalFormat("#.###");
+            round.setRoundingMode(RoundingMode.CEILING);
+            for (int i = 0; i < roadNames.size(); i++) {
+                if (distances.get(i) < 1) {
+                    // If Distance traveled on this road is lower than 1 kilometer the distance unit is changed to meters
+                    routeTaken = routeTaken + "\n" + (roadNames.get(i).substring(0, 1).toUpperCase() + roadNames.get(i).substring(1).toLowerCase()) + " Distance: " + round.format(distances.get(i) * 100) + "m";
+                } else {
+                    // If distance traveled on this road is greater than 1 kilometer it stays as a kilometer
+                    routeTaken = routeTaken + "\n" + (roadNames.get(i).substring(0, 1).toUpperCase() + roadNames.get(i).substring(1).toLowerCase()) + " Distance: " + round.format(distances.get(i)) + "km";
+                }
+            }
+            double roadDistanceTotal = 0;
+            // Gets sum of all road distances
+            for (Double d : distances) {
+                roadDistanceTotal += d;
+            }
+            if (roadDistanceTotal < 1) {
+                routeTaken += "\nTotal Distance Traveled: " + round.format(roadDistanceTotal * 100) + "m";
+            } else {
+                routeTaken += "\nTotal Distance Traveled: " + round.format(roadDistanceTotal) + "km";
+            }
+            getTextOutputArea().setText(routeTaken);
         }
 
     }
@@ -460,31 +493,37 @@ public class AucklandMapping extends GUI {
      * Finds All Articulation Points In The Graph
      */
     public void findAllArticulationPoints() {
+        unvisitedNodes = new ArrayList<>(Nodes.values());
         for (Node n : Nodes.values()) {
             n.nodeDepth = Integer.MAX_VALUE;
             n.isArticulationPoint = false;
+            n.numberOfSubTrees = 0;
         }
         articulationPoints = new HashSet<>();
-        int numberOfSubtrees = 0;
-        Random randomIndex = new Random();
-        Object[] mapNodes = Nodes.values().toArray();
-        Node root = (Node) mapNodes[randomIndex.nextInt(mapNodes.length)];
-        HashSet<Segment> neighbours = new HashSet<>(root.outgoingEdges);
-        neighbours.addAll(root.incomingEdges);
-        for (Segment s : neighbours) {
-            Node neighbour = s.endNode;
-            if (neighbour == root) {
-                neighbour = s.startNode;
-            }
-            if (neighbour.nodeDepth == Integer.MAX_VALUE) {
-                recursiveFindArticulationPoints(neighbour, 1, root);
-                numberOfSubtrees++;
-            }
-            if (numberOfSubtrees > 0) {
-                articulationPoints.add(root);
+        while (!unvisitedNodes.isEmpty()) {
+            Random randomIndex = new Random();
+            Node root = unvisitedNodes.get(randomIndex.nextInt(unvisitedNodes.size()));
+            HashSet<Segment> neighbours = new HashSet<>(root.outgoingEdges);
+            neighbours.addAll(root.incomingEdges);
+            rootNeighbors = new HashSet<>(neighbours);
+            unvisitedNodes.remove(root);
+            for (Segment s : neighbours) {
+                Node neighbour = s.endNode;
+                if (neighbour == root) {
+                    neighbour = s.startNode;
+                }
+                unvisitedNodes.remove(neighbour);
+                if (neighbour.nodeDepth == Integer.MAX_VALUE) {
+                    recursiveFindArticulationPoints(neighbour, 1, root);
+                    neighbour.numberOfSubTrees++;
+                }
+                if (neighbour.numberOfSubTrees > 0) {
+                    articulationPoints.add(neighbour);
+                }
             }
         }
         System.out.println(articulationPoints.size());
+
     }
 
     public int recursiveFindArticulationPoints(Node node, int depth, Node parent) {
@@ -493,13 +532,14 @@ public class AucklandMapping extends GUI {
         HashSet<Segment> neighbours = new HashSet<>(node.outgoingEdges);
         neighbours.addAll(node.incomingEdges);
         for (Segment s : neighbours) {
-            if (s.endNode == parent || s.startNode == parent) {
-                continue;
-            }
             Node neighbour = s.endNode;
             if (neighbour == node) {
                 neighbour = s.startNode;
             }
+            if (neighbour == parent) {
+                continue;
+            }
+            unvisitedNodes.remove(neighbour);
             if (neighbour.nodeDepth < Integer.MAX_VALUE) {
                 reachBack = Math.min(neighbour.nodeDepth, reachBack);
             }
