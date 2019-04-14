@@ -80,7 +80,7 @@ public class Node {
     }
 
 
-    public void deselectRouteRoads() {
+    public void deselect() {
         if (routeSelected) {
             routeSelected = false;
             for (Segment S : outgoingEdges) {
@@ -88,7 +88,43 @@ public class Node {
                     S.routeSelected = false;
                 }
             }
+            for (Segment S : incomingEdges) {
+                if (S.routeSelected) {
+                    S.routeSelected = false;
+                }
+            }
+        }
+        if (isSelected) {
+            isSelected = false;
+            for (Segment S : outgoingEdges) {
+                if (S.isSelected) {
+                    S.isSelected = false;
+                }
+            }
+            for (Segment S : incomingEdges) {
+                if (S.isSelected) {
+                    S.isSelected = false;
+                }
+            }
+        }
+        isArticulationPoint = false;
+    }
+
+    public void deselectRoute() {
+        if (routeSelected) {
+            routeSelected = false;
+            for (Segment S : outgoingEdges) {
+                if (S.routeSelected) {
+                    S.routeSelected = false;
+                }
+            }
+            for (Segment S : incomingEdges) {
+                if (S.routeSelected) {
+                    S.routeSelected = false;
+                }
+            }
         }
     }
+
 
 }

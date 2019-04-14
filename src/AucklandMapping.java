@@ -1,10 +1,7 @@
 import java.awt.*;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseWheelEvent;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.util.*;
@@ -19,12 +16,13 @@ public class AucklandMapping extends GUI {
     private Point releasedMouse;
     private Map<String, Road> Roads = new HashMap<String, Road>();
     private Map<String, Node> Nodes = new HashMap<>();
+    private ArrayList<RouteRestriction> restrictions = new ArrayList<>();
     private ArrayList<Node> unvisitedNodes = new ArrayList<>();
     private HashSet<Segment> rootNeighbors = new HashSet<>();
     private TrieNode roadNameRoot;
     private double scale = 8;
     private Queue<Node> selectedNodes = new ArrayDeque<>();
-    private ArrayList<Node> selectedRouteNodes = new ArrayList<>();
+    private HashSet<Node> selectedRouteNodes = new HashSet<>();
     private HashSet<Node> articulationPoints = new HashSet<>();
 
 
@@ -32,7 +30,7 @@ public class AucklandMapping extends GUI {
 
     }
 
-    private void processData(File node, File roadInfo, File segmentInfo) {
+    private void processData(File node, File roadInfo, File segmentInfo, File restriction) {
         origin = Location.newFromLatLon(-36.847622, 174.763444);
         recalculateDrawingEdges();
         try {
@@ -82,7 +80,7 @@ public class AucklandMapping extends GUI {
                 String[] splittedCurLine = currentLine.split("\t");
                 String currentRoadId = splittedCurLine[0];
                 if (!Roads.keySet().contains(currentRoadId)) {
-                    Roads.put(currentRoadId, new Road(currentRoadId, Integer.parseInt(splittedCurLine[1]), splittedCurLine[2], splittedCurLine[3], Integer.parseInt(splittedCurLine[4]), Integer.parseInt(splittedCurLine[5]), Integer.parseInt(splittedCurLine[6]), Boolean.parseBoolean(splittedCurLine[7]), Boolean.parseBoolean(splittedCurLine[8]), Boolean.parseBoolean(splittedCurLine[9])));
+                    Roads.put(currentRoadId, new Road(currentRoadId, Integer.parseInt(splittedCurLine[1]), splittedCurLine[2], splittedCurLine[3], Integer.parseInt(splittedCurLine[4]), Integer.parseInt(splittedCurLine[5]), Integer.parseInt(splittedCurLine[6]), Integer.parseInt(splittedCurLine[7]), Integer.parseInt(splittedCurLine[8]), Integer.parseInt(splittedCurLine[9])));
                 }
                 Roads.get(currentRoadId).Type = Integer.parseInt(splittedCurLine[1]);
                 Roads.get(currentRoadId).StreetName = splittedCurLine[2];
@@ -90,9 +88,9 @@ public class AucklandMapping extends GUI {
                 Roads.get(currentRoadId).Oneway = Integer.parseInt(splittedCurLine[4]);
                 Roads.get(currentRoadId).Speed = Integer.parseInt(splittedCurLine[5]);
                 Roads.get(currentRoadId).RoadClass = Integer.parseInt(splittedCurLine[6]);
-                Roads.get(currentRoadId).NotForCar = Boolean.parseBoolean(splittedCurLine[7]);
-                Roads.get(currentRoadId).NotForPedestrain = Boolean.parseBoolean(splittedCurLine[8]);
-                Roads.get(currentRoadId).NotForBicycle = Boolean.parseBoolean(splittedCurLine[9]);
+                Roads.get(currentRoadId).NotForCar = Integer.parseInt(splittedCurLine[7]);
+                Roads.get(currentRoadId).NotForPedestrain = Integer.parseInt(splittedCurLine[8]);
+                Roads.get(currentRoadId).NotForBicycle = Integer.parseInt(splittedCurLine[9]);
             }
             fileScanner.close();
         } catch (IOException e) {
@@ -113,6 +111,36 @@ public class AucklandMapping extends GUI {
         for (Segment s : unsortedSegments) {
             if (Roads.get(s.roadId) != null) {
                 Roads.get(s.roadId).addRoadSegments(s);
+            }
+        }
+        // Processes Restrictions
+        if (restriction != null) {
+            try {
+                BufferedReader fileScanner = new BufferedReader(new FileReader(restriction));
+                fileScanner.readLine();
+                while (fileScanner.ready()) {
+                    String currentLine = fileScanner.readLine();
+                    String[] splittedCurLine = currentLine.split("\t");
+                    Segment segment1 = null, segment2 = null;
+                    Node node1 = Nodes.get(splittedCurLine[0]), nodeIntersection = Nodes.get(splittedCurLine[2]), node2 = Nodes.get(splittedCurLine[4]);
+                    HashSet<Segment> neighbours = new HashSet<>(node1.outgoingEdges);
+                    neighbours.addAll(node1.incomingEdges);
+                    for (Segment s : neighbours) {
+                        if (s.roadId.equals(splittedCurLine[1])) {
+                            segment1 = s;
+                        }
+                    }
+                    neighbours = new HashSet<>(nodeIntersection.outgoingEdges);
+                    neighbours.addAll(node2.incomingEdges);
+                    for (Segment s : neighbours) {
+                        if (s.roadId.equals(splittedCurLine[4])) {
+                            segment2 = s;
+                        }
+                    }
+                    restrictions.add(new RouteRestriction(splittedCurLine[0], segment1, splittedCurLine[2], segment2, splittedCurLine[3]));
+                }
+            } catch (IOException e) {
+                System.out.println("IO Exception Occurred");
             }
         }
         // Generate Trie
@@ -280,8 +308,8 @@ public class AucklandMapping extends GUI {
     }
 
     @Override
-    protected void onLoad(File nodes, File roads, File segments, File polygons) {
-        processData(nodes, roads, segments);
+    protected void onLoad(File nodes, File roads, File segments, File polygons, File restriction) {
+        processData(nodes, roads, segments, restriction);
     }
 
     @Override
@@ -292,11 +320,16 @@ public class AucklandMapping extends GUI {
     }
 
     private void aStarRouteSearch(Node startNode, Node endNode) {
+        ArrayList<RouteRestriction> possibleRestrictionLower = new ArrayList<>();
+        ArrayList<RouteRestriction> possibleRestrictionMiddle = new ArrayList<>();
+        ArrayList<RouteRestriction> possibleRestrictionUpper = new ArrayList<>();
         // Sets all nodes heuristic
         for (String s : Nodes.keySet()) {
             Nodes.get(s).routeSelected = false;
-            Nodes.get(s).deselectRouteRoads();
+            Nodes.get(s).deselectRoute();
             Nodes.get(s).h = (Nodes.get(s).nodeOriginLocation.distance(endNode.nodeOriginLocation));
+            Nodes.get(s).previousNode = null;
+            Nodes.get(s).g = 0;
         }
         HashSet<Node> visited = new HashSet<>();
         PriorityQueue<Node> fringe = new PriorityQueue<>(new Comparator<Node>() {
@@ -317,6 +350,11 @@ public class AucklandMapping extends GUI {
         Node current = startNode;
         while (!fringe.isEmpty() && !endNodeFound) {
             current = fringe.poll();
+            for (RouteRestriction r : restrictions) {
+                if (current.nodeID.equals(r.nodeID1)) {
+                    possibleRestrictionLower.add(r);
+                }
+            }
             visited.add(current);
             if (current == endNode) {
                 endNodeFound = true;
@@ -325,16 +363,24 @@ public class AucklandMapping extends GUI {
             combinedEdges.addAll(current.incomingEdges);
             for (Segment S : combinedEdges) {
                 Node road = S.endNode;
+
                 if (Roads.get(S.roadId).Oneway > 0) {
                     if (road == current) {
                         continue;
                     }
                 }
+                // Checks if this segment is accessible by cars
+                if (Roads.get(S.roadId).NotForCar == 1) {
+                    continue;
+                }
+                //determines if the segment starts or terminates in current
                 if (current == S.endNode) {
                     road = S.startNode;
                 } else {
                     road = S.endNode;
                 }
+
+                // Checks if this route is effected by restrictions
                 double roadLength = S.segmentLength;
                 double g = current.getG() + roadLength;
                 double f = g + road.h;
@@ -347,6 +393,24 @@ public class AucklandMapping extends GUI {
                     if (fringe.contains(road)) {
                         fringe.remove(road);
                     }
+                    for (RouteRestriction r : possibleRestrictionUpper) {
+                        if (S == r.road2) {
+                            continue;
+                        }
+                    }
+                    possibleRestrictionUpper.clear();
+                    for (RouteRestriction r : possibleRestrictionMiddle) {
+                        if (road.nodeID.equals(r.intersection)) {
+                            possibleRestrictionUpper.add(r);
+                        }
+                    }
+                    possibleRestrictionMiddle.clear();
+                    for (RouteRestriction r : possibleRestrictionLower) {
+                        if (r.road1 == S) {
+                            possibleRestrictionMiddle.add(r);
+                        }
+                    }
+                    possibleRestrictionLower.clear();
                     fringe.offer(road);
                 }
             }
@@ -357,13 +421,11 @@ public class AucklandMapping extends GUI {
             ArrayList<String> roadNames = new ArrayList<>();
             ArrayList<Double> distances = new ArrayList<>();
             while (current.previousNode != null) {
-                current.routeSelected = true;
                 HashSet<Segment> neighbours = new HashSet<>(current.outgoingEdges);
                 neighbours.addAll(current.incomingEdges);
                 for (Segment s : neighbours) {
                     Node previousNode = s.endNode;
                     if (previousNode == current.previousNode || s.startNode == current.previousNode) {
-                        s.routeSelected = true;
                         if (previousNode == current) {
                             previousNode = s.startNode;
                         }
@@ -381,6 +443,9 @@ public class AucklandMapping extends GUI {
                         } else {
                             currentRoadDistance += s.segmentLength;
                         }
+                        current.routeSelected = true;
+                        selectedRouteNodes.add(current);
+                        s.routeSelected = true;
                         current = previousNode;
                         break;
                     }
@@ -415,6 +480,8 @@ public class AucklandMapping extends GUI {
                 routeTaken += "\nTotal Distance Traveled: " + round.format(roadDistanceTotal) + "km";
             }
             getTextOutputArea().setText(routeTaken);
+        } else {
+            getTextOutputArea().setText("No Route Found");
         }
 
     }
@@ -477,8 +544,12 @@ public class AucklandMapping extends GUI {
      * Deselects all nodes and roads
      */
     protected void deselectAll() {
-        for (Node n : selectedRouteNodes) {
-            n.deselectRouteRoads();
+        HashSet<Node> combindedDeletion = new HashSet<>();
+        combindedDeletion.addAll(selectedNodes);
+        combindedDeletion.addAll(selectedRouteNodes);
+        combindedDeletion.addAll(articulationPoints);
+        for (Node n : combindedDeletion) {
+            n.deselect();
         }
         for (int i = 0; i < selectedNodes.size() + 1; i++) {
             Node deselect = selectedNodes.poll();
@@ -487,6 +558,9 @@ public class AucklandMapping extends GUI {
             }
         }
         selectedNodes.clear();
+        selectedRouteNodes.clear();
+        articulationPoints.clear();
+        getTextOutputArea().setText("");
     }
 
     /**
@@ -497,32 +571,32 @@ public class AucklandMapping extends GUI {
         for (Node n : Nodes.values()) {
             n.nodeDepth = Integer.MAX_VALUE;
             n.isArticulationPoint = false;
-            n.numberOfSubTrees = 0;
         }
         articulationPoints = new HashSet<>();
+        Node root = null;
         while (!unvisitedNodes.isEmpty()) {
+            int numberOfSubTrees = 0;
             Random randomIndex = new Random();
-            Node root = unvisitedNodes.get(randomIndex.nextInt(unvisitedNodes.size()));
+            // Chooses a random value from unvisitedNodes
+            root = unvisitedNodes.get(randomIndex.nextInt(unvisitedNodes.size()));
             HashSet<Segment> neighbours = new HashSet<>(root.outgoingEdges);
             neighbours.addAll(root.incomingEdges);
-            rootNeighbors = new HashSet<>(neighbours);
             unvisitedNodes.remove(root);
+            root.nodeDepth = 0;
             for (Segment s : neighbours) {
                 Node neighbour = s.endNode;
                 if (neighbour == root) {
                     neighbour = s.startNode;
                 }
-                unvisitedNodes.remove(neighbour);
                 if (neighbour.nodeDepth == Integer.MAX_VALUE) {
                     recursiveFindArticulationPoints(neighbour, 1, root);
-                    neighbour.numberOfSubTrees++;
+                    numberOfSubTrees++;
                 }
-                if (neighbour.numberOfSubTrees > 0) {
-                    articulationPoints.add(neighbour);
+                if (numberOfSubTrees > 0) {
+                    articulationPoints.add(root);
                 }
             }
         }
-        System.out.println(articulationPoints.size());
 
     }
 
@@ -532,6 +606,7 @@ public class AucklandMapping extends GUI {
         HashSet<Segment> neighbours = new HashSet<>(node.outgoingEdges);
         neighbours.addAll(node.incomingEdges);
         for (Segment s : neighbours) {
+            // Makes sure that the correct node is made the neighbor
             Node neighbour = s.endNode;
             if (neighbour == node) {
                 neighbour = s.startNode;
@@ -545,13 +620,13 @@ public class AucklandMapping extends GUI {
             }
             // case 2: indirect alternative path: neighbour is an unvisited child in the same sub-tree
             else {
-                // calculate alternative paths of the child, which can also be reached by itself
+
                 int childReach = recursiveFindArticulationPoints(neighbour, depth + 1, node);
                 reachBack = Math.min(childReach, reachBack);
-                // no alternative path from neighbour to any parent
+
                 if (childReach >= depth) {
                     articulationPoints.add(node);
-                }// then add node into APs;
+                }
             }
         }
         return reachBack;

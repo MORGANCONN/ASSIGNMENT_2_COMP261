@@ -4,9 +4,8 @@ import java.util.HashSet;
 
 public class Road {
     String RoadId,StreetName, City;
-    boolean  NotForCar, NotForPedestrain, NotForBicycle;
     Double Length;
-    int StartNode, EndNode, Type, Speed, RoadClass, Oneway;
+    int StartNode, EndNode, Type, Speed, RoadClass, Oneway, NotForCar, NotForPedestrain, NotForBicycle;
     HashSet<Segment> roadSegments = new HashSet<>();
     HashSet<Node> roadNodes = new HashSet<>();
 
@@ -16,7 +15,7 @@ public class Road {
         this.StartNode = StartNode;
         this.EndNode = EndNode;
     }
-    public Road(String roadId,int Type, String StreetName, String City, int OneWay, int Speed, int Roadclass, Boolean notForCar, Boolean notForPedestrain, Boolean notForBicycle){
+    public Road(String roadId,int Type, String StreetName, String City, int OneWay, int Speed, int Roadclass, int notForCar, int notForPedestrain, int notForBicycle){
         this.RoadId = roadId;
         this.Type = Type;
         this.StreetName = StreetName;
