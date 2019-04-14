@@ -78,12 +78,12 @@ public class AucklandMapping extends GUI {
                 String[] splittedCurLine = currentLine.split("\t");
                 String currentRoadId = splittedCurLine[0];
                 if (!Roads.keySet().contains(currentRoadId)) {
-                    Roads.put(currentRoadId, new Road(currentRoadId, Integer.parseInt(splittedCurLine[1]), splittedCurLine[2], splittedCurLine[3], Boolean.parseBoolean(splittedCurLine[4]), Integer.parseInt(splittedCurLine[5]), Integer.parseInt(splittedCurLine[6]), Boolean.parseBoolean(splittedCurLine[7]), Boolean.parseBoolean(splittedCurLine[8]), Boolean.parseBoolean(splittedCurLine[9])));
+                    Roads.put(currentRoadId, new Road(currentRoadId, Integer.parseInt(splittedCurLine[1]), splittedCurLine[2], splittedCurLine[3], Integer.parseInt(splittedCurLine[4]), Integer.parseInt(splittedCurLine[5]), Integer.parseInt(splittedCurLine[6]), Boolean.parseBoolean(splittedCurLine[7]), Boolean.parseBoolean(splittedCurLine[8]), Boolean.parseBoolean(splittedCurLine[9])));
                 }
                 Roads.get(currentRoadId).Type = Integer.parseInt(splittedCurLine[1]);
                 Roads.get(currentRoadId).StreetName = splittedCurLine[2];
                 Roads.get(currentRoadId).City = splittedCurLine[3];
-                Roads.get(currentRoadId).Oneway = Boolean.parseBoolean(splittedCurLine[4]);
+                Roads.get(currentRoadId).Oneway = Integer.parseInt(splittedCurLine[4]);
                 Roads.get(currentRoadId).Speed = Integer.parseInt(splittedCurLine[5]);
                 Roads.get(currentRoadId).RoadClass = Integer.parseInt(splittedCurLine[6]);
                 Roads.get(currentRoadId).NotForCar = Boolean.parseBoolean(splittedCurLine[7]);
@@ -132,11 +132,11 @@ public class AucklandMapping extends GUI {
 
     @Override
     protected void redraw(Graphics g) {
+        for (Node n : articulationPoints) {
+            n.isArticulationPoint = true;
+        }
         for (String r : Nodes.keySet()) {
             Nodes.get(r).redraw(g, origin, scale);
-        }
-        for(Node n : articulationPoints){
-            n.isArticulationPoint = true;
         }
     }
 
@@ -320,7 +320,12 @@ public class AucklandMapping extends GUI {
             ArrayList<Segment> combinedEdges = new ArrayList<>(current.outgoingEdges);
             combinedEdges.addAll(current.incomingEdges);
             for (Segment S : combinedEdges) {
-                Node road;
+                Node road = S.endNode;
+                if (Roads.get(S.roadId).Oneway > 0) {
+                    if (road == current) {
+                        continue;
+                    }
+                }
                 if (current == S.endNode) {
                     road = S.startNode;
                 } else {
@@ -343,12 +348,40 @@ public class AucklandMapping extends GUI {
             }
         }
         if (current == endNode) {
+            String currentRoadId = null;
+            double currentRoadDistance = 0;
+            ArrayList<String> roadIds = new ArrayList<>();
+            ArrayList<Double> distances = new ArrayList<>();
             while (current.previousNode != null) {
-                current.routeSelected = true;
-                selectedRouteNodes.add(current);
-                current.printCorrectRoad(current.previousNode);
-                current = current.previousNode;
+                HashSet<Segment> neighbours = new HashSet<>(current.outgoingEdges);
+                neighbours.addAll(current.incomingEdges);
+                for (Segment s : neighbours) {
+                    Node previousNode = s.endNode;
+                    if (previousNode == current.previousNode || s.startNode == current.previousNode) {
+                        if (previousNode == current) {
+                            previousNode = s.startNode;
+                        }
+                        if (s.roadId != currentRoadId) {
+                            if (currentRoadId != null) {
+                                roadIds.add(currentRoadId);
+                            }
+                            currentRoadId = s.roadId;
+                            if (currentRoadDistance > 0) {
+                                distances.add(currentRoadDistance);
+                            }
+                        } else{
+                            currentRoadDistance += s.segmentLength;
+                        }
+                        current = previousNode;
+                        break;
+                    }
+                }
             }
+            String distanceTravelled = "Calculated Route";
+            for (int i = 0; i < roadIds.size(); i++) {
+                distanceTravelled = distanceTravelled + "\n" + Roads.get(roadIds.get(i)).StreetName + " Distance Travelled On This Street: " + distances.get(i);
+            }
+            getTextOutputArea().setText(distanceTravelled);
         }
 
     }
@@ -432,25 +465,22 @@ public class AucklandMapping extends GUI {
             n.isArticulationPoint = false;
         }
         articulationPoints = new HashSet<>();
+        int numberOfSubtrees = 0;
         Random randomIndex = new Random();
         Object[] mapNodes = Nodes.values().toArray();
         Node root = (Node) mapNodes[randomIndex.nextInt(mapNodes.length)];
-        System.out.println(root.nodeID);
         HashSet<Segment> neighbours = new HashSet<>(root.outgoingEdges);
         neighbours.addAll(root.incomingEdges);
         for (Segment s : neighbours) {
-            if (s.startNode == root) {
-                if (s.endNode.nodeDepth == Integer.MAX_VALUE) {
-                    recursiveFindArticulationPoints(s.endNode, 1, root);
-                    root.numberOfSubTrees++;
-                }
-            } else if (s.endNode == root) {
-                if (s.startNode.nodeDepth == Integer.MAX_VALUE) {
-                    recursiveFindArticulationPoints(s.startNode, 1, root);
-                    root.numberOfSubTrees++;
-                }
+            Node neighbour = s.endNode;
+            if (neighbour == root) {
+                neighbour = s.startNode;
             }
-            if (root.numberOfSubTrees > 0) {
+            if (neighbour.nodeDepth == Integer.MAX_VALUE) {
+                recursiveFindArticulationPoints(neighbour, 1, root);
+                numberOfSubtrees++;
+            }
+            if (numberOfSubtrees > 0) {
                 articulationPoints.add(root);
             }
         }

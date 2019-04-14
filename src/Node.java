@@ -1,5 +1,6 @@
 import java.awt.*;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 public class Node {
     String nodeID;
@@ -28,9 +29,9 @@ public class Node {
         }
         if (isSelected || routeSelected) {
             g.setColor(Color.red);
-        } else if(isArticulationPoint){
+        } else if (isArticulationPoint) {
             g.setColor(Color.GREEN);
-        }else {
+        } else {
             g.setColor(Color.blue);
         }
         g.fillOval(nodePoints.x - 2, nodePoints.y - 2, 4, 4);
@@ -78,18 +79,6 @@ public class Node {
         this.previousNode = p;
     }
 
-    public void printCorrectRoad(Node endNode) {
-        for (Segment S : outgoingEdges) {
-            if (S.endNode == endNode || S.startNode == endNode) {
-                S.routeSelected = true;
-            }
-        }
-        for (Segment S : incomingEdges) {
-            if (S.endNode == endNode || S.startNode == endNode) {
-                S.routeSelected = true;
-            }
-        }
-    }
 
     public void deselectRouteRoads() {
         if (routeSelected) {
